@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}Team Stats{% endblock %}
+
+{% block content %}
+<div class="glass-card light">
+  <div class="section-heading">
+    <h1 class="mb-0">Team Stats</h1>
+    <span class="badge-soft">Sortable totals across the squad</span>
+  </div>
+
+  {% set current_year = now.year %}
+  {% set initial_year = preferred_year if preferred_year is not none else current_year %}
+  {% set active_year = initial_year if initial_year in [2025, 2026] else (current_year if current_year in [2025, 2026] else 2025) %}
+
+  <ul class="nav nav-tabs schedule-tabs" id="statsTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link {% if active_year == 2025 %}active{% endif %}" id="stats-tab-2025" data-year="2025" data-bs-toggle="tab" data-bs-target="#stats-2025" type="button" role="tab" aria-controls="stats-2025" aria-selected="{{ 'true' if active_year == 2025 else 'false' }}">2025</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link {% if active_year == 2026 %}active{% endif %}" id="stats-tab-2026" data-year="2026" data-bs-toggle="tab" data-bs-target="#stats-2026" type="button" role="tab" aria-controls="stats-2026" aria-selected="{{ 'true' if active_year == 2026 else 'false' }}">2026</button>
+    </li>
+  </ul>
+
+  <div class="tab-content pt-3" id="statsTabContent">
+    <div class="tab-pane fade {% if active_year == 2025 %}show active{% endif %}" id="stats-2025" data-year="2025" role="tabpanel" aria-labelledby="stats-tab-2025">
+      {% if session.logged_in %}
+      <form method="post" action="{{ url_for('stats') }}">
+        <input type="hidden" name="season_year" value="2025">
+      {% endif %}
+
+      <table class="table table-modern table-hover align-middle stats-table">
+        <thead>
+          <tr>
+            <th><a href="{{ url_for('stats', sort='player', order=next_order, season_sort=season_sort_field, season_order=season_current_order, stats_year=2025) }}">Player</a></th>
+            <th class="text-center"><a href="{{ url_for('stats', sort='goals', order=next_order, season_sort=season_sort_field, season_order=season_current_order, stats_year=2025) }}">Goals</a></th>
+            <th class="text-center"><a href="{{ url_for('stats', sort='assists', order=next_order, season_sort=season_sort_field, season_order=season_current_order, stats_year=2025) }}">Assists</a></th>
+            <th class="text-center"><a href="{{ url_for('stats', sort='player_of_match', order=next_order, season_sort=season_sort_field, season_order=season_current_order, stats_year=2025) }}">Player Of The Match</a></th>
+            <th class="text-center"><a href="{{ url_for('stats', sort='yellow_cards', order=next_order, season_sort=season_sort_field, season_order=season_current_order, stats_year=2025) }}">Yellow Cards</a></th>
+            <th class="text-center"><a href="{{ url_for('stats', sort='red_cards', order=next_order, season_sort=season_sort_field, season_order=season_current_order, stats_year=2025) }}">Red Cards</a></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for stat in player_stats %}
+          <tr>
+            <td class="fw-semibold">{{ stat.player }}</td>
+            <td class="text-center">
+              {% if session.logged_in %}
+                <input type="number" class="form-control text-center" name="goals_{{ stat.id }}" value="{{ stat.goals }}">
+              {% else %}
+                {{ stat.goals }}
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if session.logged_in %}
+                <input type="number" class="form-control text-center" name="assists_{{ stat.id }}" value="{{ stat.assists }}">
+              {% else %}
+                {{ stat.assists }}
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if session.logged_in %}
+                <input type="number" class="form-control text-center" name="player_of_match_{{ stat.id }}" value="{{ stat.player_of_match }}">
+              {% else %}
+                {{ stat.player_of_match }}
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if session.logged_in %}
+                <input type="number" class="form-control text-center" name="yellow_cards_{{ stat.id }}" value="{{ stat.yellow_cards }}">
+              {% else %}
+                {{ stat.yellow_cards }}
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if session.logged_in %}
+                <input type="number" class="form-control text-center" name="red_cards_{{ stat.id }}" value="{{ stat.red_cards }}">
+              {% else %}
+                {{ stat.red_cards }}
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% if session.logged_in %}
+        <div class="text-end">
+          <button type="submit" class="btn-glow mt-3">Save Changes</button>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+
+    <div class="tab-pane fade {% if active_year == 2026 %}show active{% endif %}" id="stats-2026" data-year="2026" role="tabpanel" aria-labelledby="stats-tab-2026">
+      {% if session.logged_in %}
+      <form method="post" action="{{ url_for('stats') }}">
+        <input type="hidden" name="season_year" value="2026">
+      {% endif %}
+
+      <table class="table table-modern table-hover align-middle stats-table">
+        <thead>
+          <tr>
+            <th><a href="{{ url_for('stats', sort=sort_field, order=current_order, season_sort='player', season_order=season_next_order, stats_year=2026) }}">Player</a></th>
+            <th class="text-center"><a href="{{ url_for('stats', sort=sort_field, order=current_order, season_sort='goals', season_order=season_next_order, stats_year=2026) }}">Goals</a></th>
+            <th class="text-center"><a href="{{ url_for('stats', sort=sort_field, order=current_order, season_sort='assists', season_order=season_next_order, stats_year=2026) }}">Assists</a></th>
+            <th class="text-center"><a href="{{ url_for('stats', sort=sort_field, order=current_order, season_sort='player_of_match', season_order=season_next_order, stats_year=2026) }}">Player Of The Match</a></th>
+            <th class="text-center"><a href="{{ url_for('stats', sort=sort_field, order=current_order, season_sort='yellow_cards', season_order=season_next_order, stats_year=2026) }}">Yellow Cards</a></th>
+            <th class="text-center"><a href="{{ url_for('stats', sort=sort_field, order=current_order, season_sort='red_cards', season_order=season_next_order, stats_year=2026) }}">Red Cards</a></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for stat in season_stats_2026 %}
+          <tr>
+            <td class="fw-semibold">{{ stat.player.name }}</td>
+            <td class="text-center">
+              {% if session.logged_in %}
+                <input type="number" class="form-control text-center" name="goals_{{ stat.player_id }}" value="{{ stat.goals }}">
+              {% else %}
+                {{ stat.goals }}
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if session.logged_in %}
+                <input type="number" class="form-control text-center" name="assists_{{ stat.player_id }}" value="{{ stat.assists }}">
+              {% else %}
+                {{ stat.assists }}
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if session.logged_in %}
+                <input type="number" class="form-control text-center" name="player_of_match_{{ stat.player_id }}" value="{{ stat.player_of_match }}">
+              {% else %}
+                {{ stat.player_of_match }}
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if session.logged_in %}
+                <input type="number" class="form-control text-center" name="yellow_cards_{{ stat.player_id }}" value="{{ stat.yellow_cards }}">
+              {% else %}
+                {{ stat.yellow_cards }}
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if session.logged_in %}
+                <input type="number" class="form-control text-center" name="red_cards_{{ stat.player_id }}" value="{{ stat.red_cards }}">
+              {% else %}
+                {{ stat.red_cards }}
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% if session.logged_in %}
+        <div class="text-end">
+          <button type="submit" class="btn-glow mt-3">Save Changes</button>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const tabKey = 'statsPreferredYear';
+    const tabSelector = '#statsTabs [data-year]';
+    const storedYear = localStorage.getItem(tabKey);
+
+    if (storedYear) {
+      const trigger = document.querySelector(`${tabSelector}[data-year="${storedYear}"]`);
+      if (trigger && typeof bootstrap !== 'undefined') {
+        const tab = new bootstrap.Tab(trigger);
+        tab.show();
+        const url = new URL(window.location);
+        url.searchParams.set('stats_year', storedYear);
+        window.history.replaceState({}, '', url);
+      }
+    }
+
+    document.querySelectorAll(tabSelector).forEach(btn => {
+      btn.addEventListener('shown.bs.tab', event => {
+        const year = event.target.getAttribute('data-year');
+        if (year) {
+          localStorage.setItem(tabKey, year);
+          const url = new URL(window.location);
+          url.searchParams.set('stats_year', year);
+          window.history.replaceState({}, '', url);
+        }
+      });
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<section class="hero-panel">
+  <div class="hero-logo">
+    <img src="{{ url_for('static', filename='cfc.ico') }}" alt="Canberra City FC crest">
+  </div>
+  <span class="hero-badge">
+    Match Ready • Community Driven
+  </span>
+  <h1 class="hero-title">Canberra City FC, united on and off the pitch.</h1>
+  <p class="hero-subtitle">
+    Stay on top of upcoming fixtures, final scorelines, and player insight at a glance. Everything the squad needs for matchday prep lives right here.
+  </p>
+  <div class="hero-actions">
+    <a href="{{ url_for('game_day') }}" class="btn-glow">
+      Match Day Hub
+    </a>
+    <a href="{{ url_for('schedule') }}" class="btn-soft">
+      View Fixtures
+    </a>
+  </div>
+</section>
+
+<div class="glass-card light">
+  <div class="section-heading">
+    <h2>Quick Actions</h2>
+    <span class="badge-soft">Tap into the areas you visit most</span>
+  </div>
+  <div class="home-links">
+    <a class="home-link" href="{{ url_for('stats') }}">Team Stats</a>
+    <a class="home-link" href="{{ url_for('results') }}">Results Archive</a>
+    <a class="home-link" href="{{ url_for('players') }}">Player Roster</a>
+    <a class="home-link" href="{{ url_for('links') }}">Useful Links</a>
+  </div>
+</div>
+{% endblock %}

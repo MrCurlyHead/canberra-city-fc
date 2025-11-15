@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Game Day{% endblock %}
+
+{% block content %}
+<div class="glass-card light">
+  {% if event %}
+    <div class="section-heading">
+      <h1>Upcoming Game Day</h1>
+      <span class="badge-soft">Matchday intel for the squad</span>
+    </div>
+    <div class="row">
+      <div class="col-md-6">
+        <p><strong>Date:</strong> {{ event.date|format_date }}</p>
+        <p><strong>Time:</strong> {{ event.time }}</p>
+      </div>
+      <div class="col-md-6">
+        <p><strong>Field:</strong> {{ event.field }}</p>
+        {% if event.opponent %}
+        <p><strong>Opponent:</strong> {{ event.opponent }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if event.type == 'match' %}
+    <div class="glass-card mt-4">
+      <h2 class="h4 mb-3">Matchday Details</h2>
+      <p><strong>Beer Duty:</strong> {{ beer_duty_player.name if beer_duty_player else 'TBD' }}</p>
+      <h3 class="h5 mt-4 mb-3">Starting 11 & Bench</h3>
+      <ul class="list-group list-group-flush list-group-glass">
+        {% for pos, player in event.lineup.items() %}
+          {% if pos != 'Beer Duty' %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">{{ pos }}</span>
+            <span>{{ player if player else 'TBD' }}</span>
+          </li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  {% else %}
+    <p class="card-muted mb-0">No upcoming game found in the schedule.</p>
+  {% endif %}
+</div>
+{% endblock %}

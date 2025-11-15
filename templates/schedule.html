@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}Schedule{% endblock %}
+
+{% block content %}
+<div class="glass-card light">
+  <div class="section-heading">
+    <h1 class="mb-0">Season Schedule</h1>
+    {% if session.logged_in %}
+    <button type="button" class="btn-glow" data-bs-toggle="modal" data-bs-target="#addEventModal">
+      Add New Event
+    </button>
+    {% endif %}
+  </div>
+  {% set events_2025 = events_by_year.get(2025, []) %}
+  {% set events_2026 = events_by_year.get(2026, []) %}
+  {% set current_year = now.year %}
+  {% set active_year = current_year if current_year in [2025, 2026] else 2025 %}
+
+  <ul class="nav nav-tabs schedule-tabs" id="scheduleTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link {% if active_year == 2025 %}active{% endif %}" id="tab-2025" data-year="2025" data-bs-toggle="tab" data-bs-target="#season-2025" type="button" role="tab" aria-controls="season-2025" aria-selected="{{ 'true' if active_year == 2025 else 'false' }}">2025</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link {% if active_year == 2026 %}active{% endif %}" id="tab-2026" data-year="2026" data-bs-toggle="tab" data-bs-target="#season-2026" type="button" role="tab" aria-controls="season-2026" aria-selected="{{ 'true' if active_year == 2026 else 'false' }}">2026</button>
+    </li>
+  </ul>
+
+  <div class="tab-content pt-3" id="scheduleTabContent">
+    <div class="tab-pane fade {% if active_year == 2025 %}show active{% endif %}" id="season-2025" data-year="2025" role="tabpanel" aria-labelledby="tab-2025">
+      {% if events_2025 %}
+      <div class="accordion accordion-modern" id="scheduleAccordion2025">
+        {% for event in events_2025 %}
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="heading{{ event.id }}">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ event.id }}" aria-expanded="false" aria-controls="collapse{{ event.id }}">
+              <div class="w-100 d-flex flex-column">
+                <span class="fw-bold">{{ event.date|format_date }} - {{ event.time }}</span>
+                <span class="small schedule-subheading">
+                  Canberra City FC vs {{ event.opponent or 'TBD' }}
+                </span>
+              </div>
+            </button>
+          </h2>
+          <div id="collapse{{ event.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ event.id }}" data-bs-parent="#scheduleAccordion2025">
+            <div class="accordion-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <p><strong>Date:</strong> {{ event.date|format_date }}</p>
+                  <p><strong>Time:</strong> {{ event.time }}</p>
+                </div>
+                <div class="col-md-6">
+                  <p><strong>Field:</strong> {{ event.field }}</p>
+                  <p><strong>Opponent:</strong> {{ event.opponent }}</p>
+                </div>
+              </div>
+              <hr>
+              <h5 class="mt-3">Lineup</h5>
+              <table class="table table-sm table-modern lineup-table">
+                <thead>
+                  <tr>
+                    <th style="width: 40%;">Position</th>
+                    <th style="width: 60%;">Player</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for pos, player in event.lineup.items() %}
+                    {% if pos != 'Beer Duty' %}
+                    <tr>
+                      <td><strong>{{ pos }}</strong></td>
+                      <td>{{ player if player else 'TBD' }}</td>
+                    </tr>
+                    {% endif %}
+                  {% endfor %}
+                </tbody>
+              </table>
+              <p class="mt-3"><strong>Beer Duty:</strong> {{ event.lineup['Beer Duty'] if event.lineup['Beer Duty'] else 'TBD' }}</p>
+              {% if session.logged_in %}
+              <div class="d-flex justify-content-end">
+                <a href="{{ url_for('edit_schedule', event_id=event.id) }}" class="btn btn-soft me-2">Edit</a>
+                <a href="{{ url_for('delete_schedule', event_id=event.id) }}" class="btn btn-danger-soft" onclick="return confirm('Are you sure you want to delete this event?');">Delete</a>
+              </div>
+            {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="card-muted mb-0">No events scheduled yet for the 2025 season.</p>
+      {% endif %}
+    </div>
+
+    <div class="tab-pane fade {% if active_year == 2026 %}show active{% endif %}" id="season-2026" data-year="2026" role="tabpanel" aria-labelledby="tab-2026">
+      {% if events_2026 %}
+      <div class="accordion accordion-modern" id="scheduleAccordion2026">
+        {% for event in events_2026 %}
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="heading2026{{ event.id }}">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse2026{{ event.id }}" aria-expanded="false" aria-controls="collapse2026{{ event.id }}">
+              <div class="w-100 d-flex flex-column">
+                <span class="fw-bold">{{ event.date|format_date }} - {{ event.time }}</span>
+                <span class="small schedule-subheading">
+                  Canberra City FC vs {{ event.opponent or 'TBD' }}
+                </span>
+              </div>
+            </button>
+          </h2>
+          <div id="collapse2026{{ event.id }}" class="accordion-collapse collapse" aria-labelledby="heading2026{{ event.id }}" data-bs-parent="#scheduleAccordion2026">
+            <div class="accordion-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <p><strong>Date:</strong> {{ event.date|format_date }}</p>
+                  <p><strong>Time:</strong> {{ event.time }}</p>
+                </div>
+                <div class="col-md-6">
+                  <p><strong>Field:</strong> {{ event.field }}</p>
+                  <p><strong>Opponent:</strong> {{ event.opponent }}</p>
+                </div>
+              </div>
+              <hr>
+              <h5 class="mt-3">Lineup</h5>
+              <table class="table table-sm table-modern lineup-table">
+                <thead>
+                  <tr>
+                    <th style="width: 40%;">Position</th>
+                    <th style="width: 60%;">Player</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for pos, player in event.lineup.items() %}
+                    {% if pos != 'Beer Duty' %}
+                    <tr>
+                      <td><strong>{{ pos }}</strong></td>
+                      <td>{{ player if player else 'TBD' }}</td>
+                    </tr>
+                    {% endif %}
+                  {% endfor %}
+                </tbody>
+              </table>
+              <p class="mt-3"><strong>Beer Duty:</strong> {{ event.lineup['Beer Duty'] if event.lineup['Beer Duty'] else 'TBD' }}</p>
+              {% if session.logged_in %}
+              <div class="d-flex justify-content-end">
+                <a href="{{ url_for('edit_schedule', event_id=event.id) }}" class="btn btn-soft me-2">Edit</a>
+                <a href="{{ url_for('delete_schedule', event_id=event.id) }}" class="btn btn-danger-soft" onclick="return confirm('Are you sure you want to delete this event?');">Delete</a>
+              </div>
+            {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="card-muted mb-0">No events scheduled yet for the 2026 season. Add fixtures here once the new season is released.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const tabKey = 'schedulePreferredYear';
+    const tabSelector = '#scheduleTabs [data-year]';
+    const storedYear = localStorage.getItem(tabKey);
+
+    if (storedYear) {
+      const trigger = document.querySelector(`${tabSelector}[data-year="${storedYear}"]`);
+      if (trigger && typeof bootstrap !== 'undefined') {
+        const tab = new bootstrap.Tab(trigger);
+        tab.show();
+      }
+    }
+
+    document.querySelectorAll(tabSelector).forEach(btn => {
+      btn.addEventListener('shown.bs.tab', event => {
+        const year = event.target.getAttribute('data-year');
+        if (year) {
+          localStorage.setItem(tabKey, year);
+        }
+      });
+    });
+  });
+</script>
+
+<!-- Add Event Modal -->
+<div class="modal fade" id="addEventModal" tabindex="-1" aria-labelledby="addEventModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('schedule') }}">
+        <div class="modal-header">
+          <h5 class="modal-title" id="addEventModalLabel">Add New Event</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="date" class="form-label">Date:</label>
+            <input type="date" class="form-control" id="date" name="date" required
+                   min="{{ now.year }}-01-01"
+                   max="{{ now.year + 1 }}-12-31">
+          </div>
+          <div class="mb-3">
+            <label for="time" class="form-label">Time (HH:MM):</label>
+            <select class="form-select" id="time" name="time" required>
+              {% for hour in range(0, 24) %}
+                {% for minute in [0, 15, 30, 45] %}
+                  {% set t = "%02d:%02d"|format(hour, minute) %}
+                  <option value="{{ t }}">{{ t }}</option>
+                {% endfor %}
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="field" class="form-label">Field:</label>
+            <input type="text" class="form-control" id="field" name="field" required>
+          </div>
+          <div class="mb-3">
+            <label for="opponent" class="form-label">Opponent:</label>
+            <input type="text" class="form-control" id="opponent" name="opponent">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Event</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

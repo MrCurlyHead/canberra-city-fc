@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Edit Schedule{% endblock %}
+
+{% block content %}
+<div class="glass-card light">
+  <div class="section-heading">
+    <h1 class="mb-0">Edit Match Schedule</h1>
+    <span class="badge-soft">{{ event.date|format_date }} • {{ event.field }}</span>
+  </div>
+
+  <form method="post">
+    <div class="row g-4">
+      <div class="col-md-6">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-control" name="date" value="{{ event.date }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Time</label>
+        <input type="time" class="form-control" name="time" value="{{ event.time }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Field</label>
+        <input type="text" class="form-control" name="field" value="{{ event.field }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Opponent</label>
+        <input type="text" class="form-control" name="opponent" value="{{ event.opponent }}">
+      </div>
+    </div>
+
+    <hr class="my-4">
+    <h4 class="mb-3">Lineup</h4>
+    <div class="row">
+      {% for pos in event.lineup.keys() if pos not in ['Away', 'Beer Duty'] %}
+      <div class="col-md-6 mb-3">
+        <label class="form-label">{{ pos }}</label>
+        <select class="form-select" name="{{ pos }}">
+          <option value="">-- Select Player --</option>
+          {% for player in players %}
+            <option value="{{ player.name }}" {% if event.lineup[pos] == player.name %}selected{% endif %}>{{ player.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Beer Duty</label>
+      <select class="form-select" name="Beer Duty">
+        <option value="">-- Select Player --</option>
+        {% for player in players %}
+          <option value="{{ player.name }}" {% if event.lineup['Beer Duty'] == player.name %}selected{% endif %}>{{ player.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mt-4">
+      <h5 class="text-uppercase text-secondary mb-2">Players marked as Away</h5>
+      {% set away_list = event.lineup['Away'].split(',') if event.lineup['Away'] else [] %}
+      {% if away_list %}
+        <div class="d-flex flex-wrap gap-2">
+          {% for name in away_list if name %}
+            <span class="badge-soft">{{ name }}</span>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="card-muted mb-0">No one marked away for this fixture.</p>
+      {% endif %}
+    </div>
+
+    <div class="text-end mt-4">
+      <button type="submit" class="btn-glow">Save Changes</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+

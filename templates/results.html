@@ -1,0 +1,262 @@
+<!-- templates/results.html -->
+{% extends "base.html" %}
+{% block title %}Results{% endblock %}
+
+{% block content %}
+<div class="glass-card light">
+  <div class="section-heading">
+    <h1 class="mb-0">Match Results</h1>
+    <span class="badge-soft">Track form across the season</span>
+  </div>
+
+  {% set events_2025 = events_by_year.get(2025, []) %}
+  {% set events_2026 = events_by_year.get(2026, []) %}
+  {% set current_year = now.year %}
+  {% set active_year = current_year if current_year in [2025, 2026] else 2025 %}
+
+  <ul class="nav nav-tabs schedule-tabs" id="resultsTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link {% if active_year == 2025 %}active{% endif %}" id="results-tab-2025" data-year="2025" data-bs-toggle="tab" data-bs-target="#results-2025" type="button" role="tab" aria-controls="results-2025" aria-selected="{{ 'true' if active_year == 2025 else 'false' }}">2025</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link {% if active_year == 2026 %}active{% endif %}" id="results-tab-2026" data-year="2026" data-bs-toggle="tab" data-bs-target="#results-2026" type="button" role="tab" aria-controls="results-2026" aria-selected="{{ 'true' if active_year == 2026 else 'false' }}">2026</button>
+    </li>
+  </ul>
+
+  <div class="tab-content pt-3" id="resultsTabContent">
+    <div class="tab-pane fade {% if active_year == 2025 %}show active{% endif %}" id="results-2025" data-year="2025" role="tabpanel" aria-labelledby="results-tab-2025">
+      {% if events_2025 %}
+      <div class="accordion accordion-modern" id="resultsAccordion2025">
+        {% for event in events_2025 %}
+          {% set res = event.result or {} %}
+          {% set hs = res.get('home_score', '') | int %}
+          {% set as = res.get('away_score', '') | int %}
+          {% if hs > as %}
+            {% set result_class = 'result-win' %}
+            {% set headline = 'Win' %}
+            {% set badge_class = 'badge-win' %}
+          {% elif hs < as %}
+            {% set result_class = 'result-loss' %}
+            {% set headline = 'Loss' %}
+            {% set badge_class = 'badge-loss' %}
+          {% else %}
+            {% set result_class = 'result-draw' %}
+            {% set headline = 'Draw' %}
+            {% set badge_class = 'badge-draw' %}
+          {% endif %}
+
+          <div class="accordion-item {{ result_class }}">
+            <h2 class="accordion-header" id="results-heading-2025-{{ event.id }}">
+              <button class="accordion-button collapsed" type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#results-collapse-2025-{{ event.id }}"
+                      aria-expanded="false"
+                      aria-controls="results-collapse-2025-{{ event.id }}">
+                <div class="w-100 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                  <div class="d-flex flex-column">
+                    <span class="fw-bold">{{ event.date|format_date }} • {{ event.time }}</span>
+                    <span class="small schedule-subheading">
+                      Canberra City FC vs {{ event.opponent or 'TBD' }}
+                    </span>
+                  </div>
+                  <div class="text-end">
+                    <span class="badge-soft me-2 {{ badge_class }}">{{ headline }}</span>
+                    <span class="fw-semibold fs-5">{{ hs }} : {{ as }}</span>
+                  </div>
+                </div>
+              </button>
+            </h2>
+
+            <div id="results-collapse-2025-{{ event.id }}" class="accordion-collapse collapse"
+                 aria-labelledby="results-heading-2025-{{ event.id }}"
+                 data-bs-parent="#resultsAccordion2025">
+              <div class="accordion-body">
+                <div class="row">
+                  <div class="col-md-6">
+                    <p><strong>Field:</strong> {{ event.field }}</p>
+                  </div>
+                  <div class="col-md-6">
+                    <p><strong>Opponent:</strong> {{ event.opponent }}</p>
+                  </div>
+                </div>
+                <p><strong>Scoreline:</strong> {{ hs }} - {{ as }}</p>
+
+                {% if res.goal_scorers %}
+                  <h3 class="h6 text-uppercase results-section-heading mt-4">Goal Scorers</h3>
+                  <ul class="list-group list-group-glass list-group-flush">
+                    {% for gs in res.goal_scorers %}
+                      <li class="list-group-item d-flex justify-content-between">
+                        <span>{{ gs.player }}</span>
+                        <span class="fw-semibold">{{ gs.goals }}</span>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+
+                {% if res.assists %}
+                  <h3 class="h6 text-uppercase results-section-heading mt-4">Assists</h3>
+                  <ul class="list-group list-group-glass list-group-flush">
+                    {% for a in res.assists %}
+                      <li class="list-group-item d-flex justify-content-between">
+                        <span>{{ a.player }}</span>
+                        <span class="fw-semibold">{{ a.assists }}</span>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+
+                {% if res.cards %}
+                  <h3 class="h6 text-uppercase results-section-heading mt-4">Discipline</h3>
+                  {% if res.cards.yellow %}
+                    <p class="mb-1">🟨 Yellow: {{ res.cards.yellow | join(', ') }}</p>
+                  {% endif %}
+                  {% if res.cards.red %}
+                    <p class="mb-0">🟥 Red: {{ res.cards.red | join(', ') }}</p>
+                  {% endif %}
+                {% endif %}
+
+                {% if session.logged_in %}
+                  <a href="{{ url_for('edit_result', event_id=event.id) }}"
+                     class="btn btn-soft mt-3">Edit Result</a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="card-muted mb-0">No match results recorded yet for the 2025 season.</p>
+      {% endif %}
+    </div>
+
+    <div class="tab-pane fade {% if active_year == 2026 %}show active{% endif %}" id="results-2026" data-year="2026" role="tabpanel" aria-labelledby="results-tab-2026">
+      {% if events_2026 %}
+      <div class="accordion accordion-modern" id="resultsAccordion2026">
+        {% for event in events_2026 %}
+          {% set res = event.result or {} %}
+          {% set hs = res.get('home_score', '') | int %}
+          {% set as = res.get('away_score', '') | int %}
+          {% if hs > as %}
+            {% set result_class = 'result-win' %}
+            {% set headline = 'Win' %}
+            {% set badge_class = 'badge-win' %}
+          {% elif hs < as %}
+            {% set result_class = 'result-loss' %}
+            {% set headline = 'Loss' %}
+            {% set badge_class = 'badge-loss' %}
+          {% else %}
+            {% set result_class = 'result-draw' %}
+            {% set headline = 'Draw' %}
+            {% set badge_class = 'badge-draw' %}
+          {% endif %}
+
+          <div class="accordion-item {{ result_class }}">
+            <h2 class="accordion-header" id="results-heading-2026-{{ event.id }}">
+              <button class="accordion-button collapsed" type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#results-collapse-2026-{{ event.id }}"
+                      aria-expanded="false"
+                      aria-controls="results-collapse-2026-{{ event.id }}">
+                <div class="w-100 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                  <div class="d-flex flex-column">
+                    <span class="fw-bold">{{ event.date|format_date }} • {{ event.time }}</span>
+                    <span class="small schedule-subheading">
+                      Canberra City FC vs {{ event.opponent or 'TBD' }}
+                    </span>
+                  </div>
+                  <div class="text-end">
+                    <span class="badge-soft me-2 {{ badge_class }}">{{ headline }}</span>
+                    <span class="fw-semibold fs-5">{{ hs }} : {{ as }}</span>
+                  </div>
+                </div>
+              </button>
+            </h2>
+
+            <div id="results-collapse-2026-{{ event.id }}" class="accordion-collapse collapse"
+                 aria-labelledby="results-heading-2026-{{ event.id }}"
+                 data-bs-parent="#resultsAccordion2026">
+              <div class="accordion-body">
+                <div class="row">
+                  <div class="col-md-6">
+                    <p><strong>Field:</strong> {{ event.field }}</p>
+                  </div>
+                  <div class="col-md-6">
+                    <p><strong>Opponent:</strong> {{ event.opponent }}</p>
+                  </div>
+                </div>
+                <p><strong>Scoreline:</strong> {{ hs }} - {{ as }}</p>
+
+                {% if res.goal_scorers %}
+                  <h3 class="h6 text-uppercase results-section-heading mt-4">Goal Scorers</h3>
+                  <ul class="list-group list-group-glass list-group-flush">
+                    {% for gs in res.goal_scorers %}
+                      <li class="list-group-item d-flex justify-content-between">
+                        <span>{{ gs.player }}</span>
+                        <span class="fw-semibold">{{ gs.goals }}</span>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+
+                {% if res.assists %}
+                  <h3 class="h6 text-uppercase results-section-heading mt-4">Assists</h3>
+                  <ul class="list-group list-group-glass list-group-flush">
+                    {% for a in res.assists %}
+                      <li class="list-group-item d-flex justify-content-between">
+                        <span>{{ a.player }}</span>
+                        <span class="fw-semibold">{{ a.assists }}</span>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+
+                {% if res.cards %}
+                  <h3 class="h6 text-uppercase results-section-heading mt-4">Discipline</h3>
+                  {% if res.cards.yellow %}
+                    <p class="mb-1">🟨 Yellow: {{ res.cards.yellow | join(', ') }}</p>
+                  {% endif %}
+                  {% if res.cards.red %}
+                    <p class="mb-0">🟥 Red: {{ res.cards.red | join(', ') }}</p>
+                  {% endif %}
+                {% endif %}
+
+                {% if session.logged_in %}
+                  <a href="{{ url_for('edit_result', event_id=event.id) }}"
+                     class="btn btn-soft mt-3">Edit Result</a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="card-muted mb-0">No match results recorded yet for the 2026 season.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const tabKey = 'resultsPreferredYear';
+    const tabSelector = '#resultsTabs [data-year]';
+    const storedYear = localStorage.getItem(tabKey);
+
+    if (storedYear) {
+      const trigger = document.querySelector(`${tabSelector}[data-year="${storedYear}"]`);
+      if (trigger && typeof bootstrap !== 'undefined') {
+        const tab = new bootstrap.Tab(trigger);
+        tab.show();
+      }
+    }
+
+    document.querySelectorAll(tabSelector).forEach(btn => {
+      btn.addEventListener('shown.bs.tab', event => {
+        const year = event.target.getAttribute('data-year');
+        if (year) {
+          localStorage.setItem(tabKey, year);
+        }
+      });
+    });
+  });
+</script>
+{% endblock %}
