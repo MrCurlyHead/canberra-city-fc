@@ -687,7 +687,7 @@ a:hover {
 .player-details-container {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 5.25rem 1rem 0;
 }
 
 /* Header Section */
@@ -971,7 +971,7 @@ a:hover {
 /* Mobile Adjustments */
 @media (max-width: 767px) {
   .player-details-container {
-    padding: 0 0.75rem;
+    padding: 5.75rem 0.75rem 0;
   }
 
   .player-details-header {
