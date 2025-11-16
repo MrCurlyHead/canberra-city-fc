@@ -1,134 +1,97 @@
 {% extends "base.html" %}
 {% block title %}Player Details{% endblock %}
 {% block content %}
-<div class="glass-card light">
-  <div class="section-heading">
-    <h1 class="mb-0">Player Details</h1>
-    <span class="badge-soft">{{ players|length }} registered players</span>
+<div class="player-details-container">
+  <!-- Enhanced Header Section -->
+  <div class="player-details-header">
+    <h1 class="player-details-title">Player Details</h1>
+    <span class="player-count-badge">{{ players|length }} REGISTERED PLAYERS</span>
   </div>
 
   {% if session.logged_in %}
   <form method="post">
   {% endif %}
 
-  <!-- Desktop Table (hidden on small screens) -->
-  <div class="d-none d-md-block">
-    <table class="table table-modern align-middle players-table">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Preferred Position</th>
-          <th>Shirt Number</th>
-          <th>Beer Duty Date</th>
-          <th>Support Offered</th>
-          {% if session.logged_in %}
-          <th class="text-end">Delete</th>
-          {% endif %}
-        </tr>
-      </thead>
-      <tbody>
-        {% for p in players %}
-        <tr>
-          <td>
-            {% if session.logged_in %}
-              <input type="text" class="form-control" name="name_{{ p.id }}" value="{{ p.name }}">
-            {% else %}
-              {{ p.name }}
-            {% endif %}
-          </td>
-          <td>
-            {% if session.logged_in %}
-              <input type="text" class="form-control" name="preferred_position_{{ p.id }}" value="{{ p.preferred_position or '' }}">
-            {% else %}
-              {{ p.preferred_position or '' }}
-            {% endif %}
-          </td>
-          <td>
-            {% if session.logged_in %}
-              <input type="text" class="form-control" name="shirt_{{ p.id }}" value="{{ p.shirt_number or '' }}">
-            {% else %}
-              {{ p.shirt_number or '' }}
-            {% endif %}
-          </td>
-          <td>
-            {% if session.logged_in %}
-              <input type="date" class="form-control" name="beer_duty_date_{{ p.id }}" value="{{ p.beer_duty_date|default('') }}">
-            {% else %}
-              {{ p.beer_duty_date|default('') }}
-            {% endif %}
-          </td>
-          <td style="min-width: 220px;">
-            {% if session.logged_in %}
-              <textarea class="form-control" name="support_offered_{{ p.id }}" rows="2">{{ p.support_offered or '' }}</textarea>
-            {% else %}
-              {{ p.support_offered or '' }}
-            {% endif %}
-          </td>
-          {% if session.logged_in %}
-          <td class="text-end">
-            <a href="{{ url_for('delete_player', player_id=p.id) }}" class="btn btn-danger-soft btn-sm" onclick="return confirm('Delete {{ p.name }}?');">Delete</a>
-          </td>
-          {% endif %}
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Mobile Card Layout -->
-  <div class="d-md-none">
+  <!-- Player Cards Grid (replaces both desktop table and mobile cards) -->
+  <div class="player-cards-grid">
     {% for p in players %}
-    <div class="glass-card">
-      <div class="mb-2">
-        <label class="form-label">Name</label>
+    <div class="player-card">
+      <!-- Accent Bar -->
+      <div class="player-card-accent"></div>
+      
+      <!-- Card Content -->
+      <div class="player-card-content">
+        <!-- Player Name Header -->
+        <div class="player-card-header">
+          <div class="player-name-wrapper">
+            <h2 class="player-name">
+              {% if session.logged_in %}
+                <input type="text" class="player-name-input" name="name_{{ p.id }}" value="{{ p.name }}">
+              {% else %}
+                {{ p.name }}
+              {% endif %}
+            </h2>
+          </div>
+          <div class="player-number-wrapper">
+            {% if session.logged_in %}
+              <input type="text" class="player-number-input" name="shirt_{{ p.id }}" value="{{ p.shirt_number or '' }}" placeholder="#" maxlength="3">
+            {% elif p.shirt_number %}
+              <span class="player-number-badge">{{ p.shirt_number }}</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Player Details -->
+        <div class="player-details-list">
+          <div class="player-detail-row">
+            <span class="player-detail-label">Preferred Position</span>
+            <span class="player-detail-value">
+              {% if session.logged_in %}
+                <input type="text" class="player-detail-input" name="preferred_position_{{ p.id }}" value="{{ p.preferred_position or '' }}" placeholder="—">
+              {% else %}
+                {{ p.preferred_position or '—' }}
+              {% endif %}
+            </span>
+          </div>
+
+          <div class="player-detail-row">
+            <span class="player-detail-label">Beer Duty Date</span>
+            <span class="player-detail-value">
+              {% if session.logged_in %}
+                <input type="date" class="player-detail-input" name="beer_duty_date_{{ p.id }}" value="{{ p.beer_duty_date|default('') }}">
+              {% else %}
+                {{ p.beer_duty_date|format_date if p.beer_duty_date else '—' }}
+              {% endif %}
+            </span>
+          </div>
+
+          {% if session.logged_in or p.support_offered %}
+          <div class="player-detail-row player-detail-row-full">
+            <span class="player-detail-label">Support Offered</span>
+            <div class="player-detail-value player-detail-textarea">
+              {% if session.logged_in %}
+                <textarea class="player-detail-textarea-input" name="support_offered_{{ p.id }}" rows="2" placeholder="—">{{ p.support_offered or '' }}</textarea>
+              {% else %}
+                {{ p.support_offered or '—' }}
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+
         {% if session.logged_in %}
-          <input type="text" class="form-control" name="name_{{ p.id }}" value="{{ p.name }}">
-        {% else %}
-          {{ p.name }}
+        <div class="player-card-actions">
+          <a href="{{ url_for('delete_player', player_id=p.id) }}" class="btn btn-danger-soft btn-sm" onclick="return confirm('Delete {{ p.name }}?');">Delete</a>
+        </div>
         {% endif %}
       </div>
-      <div class="mb-2">
-        <label class="form-label">Preferred Position</label>
-        {% if session.logged_in %}
-          <input type="text" class="form-control" name="preferred_position_{{ p.id }}" value="{{ p.preferred_position or '' }}">
-        {% else %}
-          {{ p.preferred_position or '' }}
-        {% endif %}
-      </div>
-      <div class="mb-2">
-        <label class="form-label">Shirt Number</label>
-        {% if session.logged_in %}
-          <input type="text" class="form-control" name="shirt_{{ p.id }}" value="{{ p.shirt_number or '' }}">
-        {% else %}
-          {{ p.shirt_number or '' }}
-        {% endif %}
-      </div>
-      <div class="mb-2">
-        <label class="form-label">Beer Duty Date</label>
-        {% if session.logged_in %}
-          <input type="date" class="form-control" name="beer_duty_date_{{ p.id }}" value="{{ p.beer_duty_date|default('') }}">
-        {% else %}
-          {{ p.beer_duty_date|default('') }}
-        {% endif %}
-      </div>
-      <div class="mb-2">
-        <label class="form-label">Support Offered</label>
-        {% if session.logged_in %}
-          <textarea class="form-control" name="support_offered_{{ p.id }}" rows="2">{{ p.support_offered or '' }}</textarea>
-        {% else %}
-          {{ p.support_offered or '' }}
-        {% endif %}
-      </div>
-      {% if session.logged_in %}
-      <a href="{{ url_for('delete_player', player_id=p.id) }}" class="btn btn-danger-soft btn-sm mt-2" onclick="return confirm('Delete {{ p.name }}?');">Delete</a>
-      {% endif %}
     </div>
     {% endfor %}
   </div>
 
   {% if session.logged_in %}
-    <div class="text-end">
-      <button type="submit" class="btn-glow mt-3">Save Changes</button>
+    <div class="player-details-actions">
+      <button type="submit" class="btn-glow">Save Changes</button>
     </div>
   </form>
 
