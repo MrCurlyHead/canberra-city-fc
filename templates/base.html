@@ -25,6 +25,7 @@
         <li class="nav-item"><a class="nav-link {% if request.endpoint == 'stats' %}active{% endif %}" href="{{ url_for('stats') }}">Team Stats</a></li>
         <li class="nav-item"><a class="nav-link {% if request.endpoint == 'players' %}active{% endif %}" href="{{ url_for('players') }}">Player Details</a></li>
         <li class="nav-item"><a class="nav-link {% if request.endpoint == 'links' %}active{% endif %}" href="{{ url_for('links') }}">Links</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint in ['gallery'] %}active{% endif %}" href="{{ url_for('gallery') }}">Gallery</a></li>
       </ul>
       <ul class="navbar-nav ms-auto">
         {% if session.logged_in or session.guest %}
