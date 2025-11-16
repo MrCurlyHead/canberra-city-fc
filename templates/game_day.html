@@ -29,7 +29,7 @@
       <h3 class="h5 mt-4 mb-3">Starting 11 & Bench</h3>
       <ul class="list-group list-group-flush list-group-glass">
         {% for pos, player in event.lineup.items() %}
-          {% if pos != 'Beer Duty' %}
+          {% if pos != 'Beer Duty' and pos != 'Away' %}
           <li class="list-group-item d-flex justify-content-between align-items-center">
             <span class="fw-semibold">{{ pos }}</span>
             <span>{{ player if player else 'TBD' }}</span>
@@ -37,6 +37,21 @@
           {% endif %}
         {% endfor %}
       </ul>
+      {% if event.lineup.get('Away') %}
+      <div class="mt-4">
+        <h3 class="h5 mb-3">Players Marked as Away</h3>
+        {% set away_list = event.lineup['Away'].split(',') if event.lineup['Away'] else [] %}
+        {% if away_list %}
+          <div class="d-flex flex-wrap gap-2">
+            {% for name in away_list if name.strip() %}
+              <span class="badge-soft">{{ name.strip() }}</span>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="card-muted mb-0">No players marked away for this fixture.</p>
+        {% endif %}
+      </div>
+      {% endif %}
     </div>
     {% endif %}
   {% else %}
