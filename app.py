@@ -71,16 +71,23 @@ GALLERY_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'images'
 
 def allowed_media_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_MEDIA_EXTENSIONS
-
-# Ensure gallery year folders exist
-os.makedirs(os.path.join(GALLERY_ROOT, '2025'), exist_ok=True)
-os.makedirs(os.path.join(GALLERY_ROOT, '2026'), exist_ok=True)
+ 
+# Try to ensure gallery year folders exist (ignore errors on read-only FS)
+for _year in ('2025', '2026'):
+    try:
+        os.makedirs(os.path.join(GALLERY_ROOT, _year), exist_ok=True)
+    except OSError:
+        pass
 
 # Merch configuration
 MERCH_ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 STATIC_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
 MERCH_UPLOAD_DIR = os.path.join(STATIC_ROOT, 'merch')
-os.makedirs(MERCH_UPLOAD_DIR, exist_ok=True)
+try:
+    os.makedirs(MERCH_UPLOAD_DIR, exist_ok=True)
+except OSError:
+    # Ignore on read-only FS; uploads will be disabled gracefully at runtime
+    pass
 
 def allowed_merch_image(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in MERCH_ALLOWED_EXTENSIONS
@@ -814,6 +821,14 @@ def store_add():
         flash("Unsupported image type. Use png, jpg, jpeg, gif, or webp.")
         return redirect(url_for('store'))
 
+    # Ensure upload directory exists or is writable
+    if not os.path.isdir(MERCH_UPLOAD_DIR):
+        try:
+            os.makedirs(MERCH_UPLOAD_DIR, exist_ok=True)
+        except OSError:
+            flash("Uploads are disabled on this deployment (read-only filesystem).")
+            return redirect(url_for('store'))
+
     safe_name = secure_filename(file.filename)
     # Avoid overwriting by prefixing timestamp if needed
     final_name = safe_name
@@ -826,7 +841,7 @@ def store_add():
     try:
         file.save(target_path)
     except Exception:
-        flash("Failed to save image.")
+        flash("Failed to save image (filesystem not writable).")
         return redirect(url_for('store'))
 
     item = MerchItem(name=name, price=price_val, stock=stock_val, image_filename=final_name)
@@ -925,11 +940,20 @@ def gallery_upload():
     if file and allowed_media_file(file.filename):
         safe_name = secure_filename(file.filename)
         save_dir = os.path.join(GALLERY_ROOT, str(year))
-        os.makedirs(save_dir, exist_ok=True)
-        save_path = os.path.join(save_dir, safe_name)
-        file.save(save_path)
-        flash("Upload successful.")
-        return redirect(url_for('gallery', year=year))
+        try:
+            os.makedirs(save_dir, exist_ok=True)
+        except OSError:
+            flash("Uploads are disabled on this deployment (read-only filesystem).")
+            return redirect(url_for('gallery', year=year))
+        try:
+            save_path = os.path.join(save_dir, safe_name)
+            file.save(save_path)
+        except Exception:
+            flash("Failed to save file (filesystem not writable).")
+            return redirect(url_for('gallery', year=year))
+        else:
+            flash("Upload successful.")
+            return redirect(url_for('gallery', year=year))
     else:
         flash("Unsupported file type.")
         return redirect(url_for('gallery', year=year))
