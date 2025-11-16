@@ -1,8 +1,11 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.mutable import MutableDict
+from sqlalchemy.orm import selectinload
 import datetime
 import os
+import time
+import logging
 
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
@@ -53,7 +56,11 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
 }
+app.config['SQLALCHEMY_SESSION_OPTIONS'] = {
+    "expire_on_commit": False,  # keep objects warm across commits for serverless latency
+}
 db = SQLAlchemy(app)
+app.logger.setLevel(logging.INFO)
 app.jinja_env.globals['current_year'] = lambda: datetime.datetime.utcnow().year
 
 # Custom filter to format date as "DD MMM YYYY"
@@ -111,6 +118,84 @@ class Event(db.Model):
 # Create database tables if they don't exist
 with app.app_context():
     db.create_all()
+
+
+# Simple timing helper so we can inspect latency in Vercel logs.
+def _log_duration(label: str, start_time: float) -> float:
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+    app.logger.info("%s took %.2f ms", label, elapsed_ms)
+    return elapsed_ms
+
+
+def _ensure_player_stat_rows(players):
+    """Batch ensure PlayerStat rows exist without per-player queries."""
+    existing_stats = PlayerStat.query.all()
+    stats_by_name = {stat.player: stat for stat in existing_stats}
+
+    missing_stats = [
+        PlayerStat(player=player.name)
+        for player in players
+        if player.name not in stats_by_name
+    ]
+    created = bool(missing_stats)
+
+    if created:
+        # combined multiple per-player inserts into one batch write
+        db.session.add_all(missing_stats)
+        db.session.flush()
+        for stat in missing_stats:
+            stats_by_name[stat.player] = stat
+
+    return stats_by_name, created
+
+
+def _ensure_season_stat_rows(players, season_year: int):
+    """Batch ensure SeasonStat rows exist per season."""
+    if not players:
+        return {}, False
+
+    player_ids = [player.id for player in players]
+    existing_stats = (
+        SeasonStat.query.options(selectinload(SeasonStat.player))
+        .filter(
+            SeasonStat.season_year == season_year,
+            SeasonStat.player_id.in_(player_ids),
+        )
+        .all()
+    )
+    stats_by_player_id = {stat.player_id: stat for stat in existing_stats}
+
+    missing_stats = []
+    for player in players:
+        if player.id not in stats_by_player_id:
+            stat = SeasonStat(player_id=player.id, season_year=season_year)
+            stat.player = player
+            stats_by_player_id[player.id] = stat
+            missing_stats.append(stat)
+    created = bool(missing_stats)
+
+    if created:
+        # avoid one insert per player by batching the new season rows
+        db.session.add_all(missing_stats)
+        db.session.flush()
+
+    return stats_by_player_id, created
+
+
+def _sort_player_stats(stats, field, descending):
+    if field == 'player':
+        key_fn = lambda stat: stat.player.lower()
+    else:
+        key_fn = lambda stat: getattr(stat, field, 0)
+    return sorted(stats, key=key_fn, reverse=descending)
+
+
+def _sort_season_stats(stats, field, descending):
+    if field == 'player':
+        key_fn = lambda stat: (stat.player.name.lower() if stat.player else '')
+    else:
+        key_fn = lambda stat: getattr(stat, field, 0)
+    return sorted(stats, key=key_fn, reverse=descending)
 
 
 # Helper function to get the next match event (today or later)
@@ -524,13 +609,19 @@ def stats():
     if not (session.get('logged_in') or session.get('guest')):
         return redirect(url_for('login'))
 
-    # Ensure each PlayerInfo has a matching PlayerStat record
+    route_start = time.perf_counter()
+    db_section_start = time.perf_counter()
+
+    # Load all players once; hooks cache ensures we don't re-query inside loops.
     all_players = PlayerInfo.query.order_by(PlayerInfo.name).all()
-    for p in all_players:
-        existing_stat = PlayerStat.query.filter_by(player=p.name).first()
-        if not existing_stat:
-            db.session.add(PlayerStat(player=p.name))
-    db.session.commit()
+    player_stats_by_name, created_player_rows = _ensure_player_stat_rows(all_players)
+    season_stats_by_player_id, created_season_rows = _ensure_season_stat_rows(all_players, 2026)
+    db_changed = created_player_rows or created_season_rows
+
+    player_stats = list(player_stats_by_name.values())
+    season_stats_2026 = list(season_stats_by_player_id.values())
+
+    _log_duration("stats.db_setup", db_section_start)
 
     preferred_year_arg = request.args.get('stats_year')
     try:
@@ -546,10 +637,7 @@ def stats():
     current_order = request.args.get('order', 'asc')
     next_order = 'desc' if current_order == 'asc' else 'asc'
 
-    if current_order == 'desc':
-        player_stats = PlayerStat.query.order_by(db.desc(getattr(PlayerStat, sort_field))).all()
-    else:
-        player_stats = PlayerStat.query.order_by(getattr(PlayerStat, sort_field)).all()
+    player_stats = _sort_player_stats(player_stats, sort_field, current_order == 'desc')
 
     # Sorting logic (2026 table)
     season_allowed_fields = ['player', 'goals', 'assists', 'player_of_match', 'yellow_cards', 'red_cards']
@@ -559,40 +647,14 @@ def stats():
     season_current_order = request.args.get('season_order', 'asc')
     season_next_order = 'desc' if season_current_order == 'asc' else 'asc'
 
-    # Ensure season stats exist for upcoming seasons (e.g., 2026)
-    upcoming_seasons = [2026]
-    for season in upcoming_seasons:
-        existing_stat_map = {
-            stat.player_id: stat for stat in SeasonStat.query.filter_by(season_year=season).all()
-        }
-        for player in all_players:
-            if player.id not in existing_stat_map:
-                db.session.add(SeasonStat(player_id=player.id, season_year=season))
-    db.session.commit()
-
-    season_stats_query = SeasonStat.query.filter_by(season_year=2026).join(PlayerInfo)
-    if season_sort_field == 'player':
-        ordering = PlayerInfo.name.desc() if season_current_order == 'desc' else PlayerInfo.name.asc()
-    else:
-        season_attr = getattr(SeasonStat, season_sort_field)
-        ordering = season_attr.desc() if season_current_order == 'desc' else season_attr.asc()
-
-    # Secondary order by player name for stability
-    season_stats_2026 = season_stats_query.order_by(ordering, PlayerInfo.name.asc()).all()
+    season_stats_2026 = _sort_season_stats(season_stats_2026, season_sort_field, season_current_order == 'desc')
 
     # Update form (admin only)
     if request.method == 'POST' and session.get('logged_in'):
         season_year = request.form.get('season_year', '2025')
         if season_year == '2026':
-            season_stats_map = {
-                stat.player_id: stat
-                for stat in SeasonStat.query.filter_by(season_year=2026).all()
-            }
             for player in all_players:
-                stat = season_stats_map.get(player.id)
-                if not stat:
-                    stat = SeasonStat(player_id=player.id, season_year=2026)
-                    db.session.add(stat)
+                stat = season_stats_by_player_id.get(player.id)
                 try:
                     stat.goals = int(request.form.get(f"goals_{player.id}", 0))
                     stat.assists = int(request.form.get(f"assists_{player.id}", 0))
@@ -602,6 +664,7 @@ def stats():
                 except ValueError:
                     pass
             db.session.commit()
+            _log_duration("stats.db_update.2026", db_section_start)
             flash("2026 stats updated successfully.")
             return redirect(url_for('stats', stats_year=2026))
 
@@ -615,12 +678,12 @@ def stats():
             except ValueError:
                 pass  # Ignore bad input silently
         db.session.commit()
+        _log_duration("stats.db_update.2025", db_section_start)
         flash("Stats updated successfully.")
         return redirect(url_for('stats', stats_year=season_year))
 
     now = datetime.date.today()
-    return render_template(
-        "stats.html",
+    context = dict(
         player_stats=player_stats,
         sort_field=sort_field,
         next_order=next_order,
@@ -631,8 +694,14 @@ def stats():
         season_sort_field=season_sort_field,
         season_current_order=season_current_order,
         season_next_order=season_next_order,
-        preferred_year=preferred_year
+        preferred_year=preferred_year,
     )
+
+    if db_changed:
+        db.session.commit()
+
+    _log_duration("stats.total", route_start)
+    return render_template("stats.html", **context)
 
 
 # ----------------- logout Routes -----------------
