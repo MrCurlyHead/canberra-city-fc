@@ -76,6 +76,15 @@ def allowed_media_file(filename):
 os.makedirs(os.path.join(GALLERY_ROOT, '2025'), exist_ok=True)
 os.makedirs(os.path.join(GALLERY_ROOT, '2026'), exist_ok=True)
 
+# Merch configuration
+MERCH_ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+STATIC_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+MERCH_UPLOAD_DIR = os.path.join(STATIC_ROOT, 'merch')
+os.makedirs(MERCH_UPLOAD_DIR, exist_ok=True)
+
+def allowed_merch_image(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in MERCH_ALLOWED_EXTENSIONS
+
 # Custom filter to format date as "DD MMM YYYY"
 @app.template_filter('format_date')
 def format_date(value, format='%d %b %Y'):
@@ -138,6 +147,17 @@ def _log_duration(label: str, start_time: float) -> float:
     elapsed_ms = (time.perf_counter() - start_time) * 1000
     app.logger.info("%s took %.2f ms", label, elapsed_ms)
     return elapsed_ms
+
+
+class MerchItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), nullable=False)
+    price = db.Column(db.Numeric(10, 2), nullable=False)
+    stock = db.Column(db.Integer, nullable=True)  # optional
+    image_filename = db.Column(db.String(255), nullable=False)
+
+    def __repr__(self):
+        return f'<MerchItem {self.name} ${self.price}>'
 
 
 def _ensure_player_stat_rows(players):
@@ -747,6 +767,97 @@ def links():
         return redirect(url_for('login'))
     return render_template("links.html")
 
+# ----------------- Store (Merch) Routes -----------------
+
+@app.route('/store', methods=['GET'])
+def store():
+    if not (session.get('logged_in') or session.get('guest')):
+        return redirect(url_for('login'))
+    items = MerchItem.query.order_by(MerchItem.id.desc()).all()
+    return render_template('store.html', items=items)
+
+
+@app.route('/store/add', methods=['POST'])
+def store_add():
+    if not session.get('logged_in'):
+        flash("Only admin can add merchandise.")
+        return redirect(url_for('store'))
+    name = request.form.get('name', '').strip()
+    price_raw = request.form.get('price', '').strip()
+    stock_raw = request.form.get('stock', '').strip()
+    file = request.files.get('image')
+
+    if not name:
+        flash("Name is required.")
+        return redirect(url_for('store'))
+    if not price_raw:
+        flash("Price is required.")
+        return redirect(url_for('store'))
+    try:
+        # Normalize price to two decimals
+        price_val = round(float(price_raw), 2)
+    except ValueError:
+        flash("Invalid price.")
+        return redirect(url_for('store'))
+    stock_val = None
+    if stock_raw:
+        try:
+            stock_val = int(stock_raw)
+        except ValueError:
+            flash("Invalid stock value.")
+            return redirect(url_for('store'))
+
+    if not file or file.filename == '':
+        flash("Image is required.")
+        return redirect(url_for('store'))
+    if not allowed_merch_image(file.filename):
+        flash("Unsupported image type. Use png, jpg, jpeg, gif, or webp.")
+        return redirect(url_for('store'))
+
+    safe_name = secure_filename(file.filename)
+    # Avoid overwriting by prefixing timestamp if needed
+    final_name = safe_name
+    target_path = os.path.join(MERCH_UPLOAD_DIR, final_name)
+    if os.path.exists(target_path):
+        basename, ext = os.path.splitext(safe_name)
+        unique_suffix = str(int(time.time()))
+        final_name = f"{basename}_{unique_suffix}{ext}"
+        target_path = os.path.join(MERCH_UPLOAD_DIR, final_name)
+    try:
+        file.save(target_path)
+    except Exception:
+        flash("Failed to save image.")
+        return redirect(url_for('store'))
+
+    item = MerchItem(name=name, price=price_val, stock=stock_val, image_filename=final_name)
+    db.session.add(item)
+    db.session.commit()
+    flash("Merch item added.")
+    return redirect(url_for('store'))
+
+
+@app.route('/store/delete/<int:item_id>')
+def store_delete(item_id):
+    if not (session.get('logged_in') or session.get('guest')):
+        return redirect(url_for('login'))
+    if not session.get('logged_in'):
+        flash("Only admin can delete merchandise.")
+        return redirect(url_for('store'))
+    item = MerchItem.query.get_or_404(item_id)
+    image_path = os.path.join(MERCH_UPLOAD_DIR, item.image_filename) if item.image_filename else None
+    try:
+        db.session.delete(item)
+        db.session.commit()
+        if image_path and os.path.exists(image_path):
+            try:
+                os.remove(image_path)
+            except OSError:
+                pass
+        flash("Merch item deleted.")
+    except Exception:
+        db.session.rollback()
+        flash("Could not delete merch item.")
+    return redirect(url_for('store'))
 
 # ----------------- Gallery Routes -----------------
 
@@ -766,7 +877,12 @@ def gallery():
     if os.path.isdir(year_dir):
         for name in sorted(os.listdir(year_dir)):
             if allowed_media_file(name):
-                media_files.append(name)
+                try:
+                    stat = os.stat(os.path.join(year_dir, name))
+                    version = int(stat.st_mtime)
+                except OSError:
+                    version = int(time.time())
+                media_files.append({"name": name, "v": version})
 
     return render_template(
         "gallery.html",
@@ -781,7 +897,11 @@ def gallery_media(year, filename):
         abort(404)
     # Basic path traversal protection is handled by send_from_directory and secure paths
     directory = os.path.join(GALLERY_ROOT, str(year))
-    return send_from_directory(directory, filename)
+    # Disable caching so newly added files show immediately
+    response = send_from_directory(directory, filename, max_age=0)
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    return response
 
 
 @app.route('/gallery/upload', methods=['POST'])
@@ -813,6 +933,37 @@ def gallery_upload():
     else:
         flash("Unsupported file type.")
         return redirect(url_for('gallery', year=year))
+
+@app.route('/gallery/delete', methods=['POST'])
+def gallery_delete():
+    if not session.get('logged_in'):
+        flash("Only admin can delete media.")
+        return redirect(url_for('gallery'))
+    try:
+        year = int(request.form.get('year', 2025))
+    except (TypeError, ValueError):
+        year = 2025
+    year = 2025 if year not in (2025, 2026) else year
+
+    filename = request.form.get('name', '')
+    if not filename or not allowed_media_file(filename):
+        flash("Invalid file.")
+        return redirect(url_for('gallery', year=year))
+    # Only delete within the intended directory
+    target_dir = os.path.join(GALLERY_ROOT, str(year))
+    target_path = os.path.join(target_dir, filename)
+    if not os.path.abspath(target_path).startswith(os.path.abspath(target_dir)):
+        flash("Invalid path.")
+        return redirect(url_for('gallery', year=year))
+    try:
+        if os.path.exists(target_path):
+            os.remove(target_path)
+            flash("Media deleted.")
+        else:
+            flash("File not found.")
+    except OSError:
+        flash("Could not delete file.")
+    return redirect(url_for('gallery', year=year))
 
 
 if __name__ == '__main__':
