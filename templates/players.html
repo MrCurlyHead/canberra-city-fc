@@ -2,6 +2,16 @@
 {% block title %}Player Details{% endblock %}
 {% block content %}
 <div class="player-details-container">
+  <ul class="nav nav-tabs schedule-tabs" id="playersTabs" role="tablist">
+    {% set active_year = 2026 if current_year() == 2026 else 2025 %}
+    <li class="nav-item" role="presentation">
+      <button class="nav-link {% if active_year == 2025 %}active{% endif %}" id="players-tab-2025" data-year="2025" type="button" role="tab" aria-controls="players-2025" aria-selected="{{ 'true' if active_year == 2025 else 'false' }}">2025</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link {% if active_year == 2026 %}active{% endif %}" id="players-tab-2026" data-year="2026" type="button" role="tab" aria-controls="players-2026" aria-selected="{{ 'true' if active_year == 2026 else 'false' }}">2026</button>
+    </li>
+  </ul>
+
   <!-- Enhanced Header Section -->
   <div class="player-details-header">
     <h1 class="player-details-title">Player Details</h1>
@@ -106,4 +116,36 @@
   </div>
   {% endif %}
 </div>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const tabKey = 'playersPreferredYear';
+    const tabSelector = '#playersTabs [data-year]';
+    const storedYear = localStorage.getItem(tabKey);
+
+    if (storedYear) {
+      document.querySelectorAll(tabSelector).forEach(btn => btn.classList.remove('active'));
+      const trigger = document.querySelector(`${tabSelector}[data-year="${storedYear}"]`);
+      if (trigger) {
+        trigger.classList.add('active');
+        const url = new URL(window.location);
+        url.searchParams.set('players_year', storedYear);
+        window.history.replaceState({}, '', url);
+      }
+    }
+
+    document.querySelectorAll(tabSelector).forEach(btn => {
+      btn.addEventListener('click', event => {
+        const year = event.currentTarget.getAttribute('data-year');
+        if (year) {
+          localStorage.setItem(tabKey, year);
+          document.querySelectorAll(tabSelector).forEach(b => b.classList.remove('active'));
+          event.currentTarget.classList.add('active');
+          const url = new URL(window.location);
+          url.searchParams.set('players_year', year);
+          window.history.replaceState({}, '', url);
+        }
+      });
+    });
+  });
+</script>
 {% endblock %}

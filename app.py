@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import send_from_directory, abort
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import selectinload
@@ -6,6 +7,7 @@ import datetime
 import os
 import time
 import logging
+from werkzeug.utils import secure_filename
 
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
@@ -62,6 +64,17 @@ app.config['SQLALCHEMY_SESSION_OPTIONS'] = {
 db = SQLAlchemy(app)
 app.logger.setLevel(logging.INFO)
 app.jinja_env.globals['current_year'] = lambda: datetime.datetime.utcnow().year
+
+# Gallery configuration
+ALLOWED_MEDIA_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'mov', 'avi'}
+GALLERY_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'images')
+
+def allowed_media_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_MEDIA_EXTENSIONS
+
+# Ensure gallery year folders exist
+os.makedirs(os.path.join(GALLERY_ROOT, '2025'), exist_ok=True)
+os.makedirs(os.path.join(GALLERY_ROOT, '2026'), exist_ok=True)
 
 # Custom filter to format date as "DD MMM YYYY"
 @app.template_filter('format_date')
@@ -621,6 +634,18 @@ def stats():
     player_stats = list(player_stats_by_name.values())
     season_stats_2026 = list(season_stats_by_player_id.values())
 
+    # If 2026 season rows were just created, initialize them by copying 2025 totals
+    if created_season_rows:
+        for season_stat in season_stats_2026:
+            base_2025 = player_stats_by_name.get(season_stat.player.name)
+            if base_2025:
+                season_stat.goals = base_2025.goals
+                season_stat.assists = base_2025.assists
+                season_stat.player_of_match = base_2025.player_of_match
+                season_stat.yellow_cards = base_2025.yellow_cards
+                season_stat.red_cards = base_2025.red_cards
+        db_changed = True
+
     _log_duration("stats.db_setup", db_section_start)
 
     preferred_year_arg = request.args.get('stats_year')
@@ -721,6 +746,73 @@ def links():
     if not (session.get('logged_in') or session.get('guest')):
         return redirect(url_for('login'))
     return render_template("links.html")
+
+
+# ----------------- Gallery Routes -----------------
+
+@app.route('/gallery')
+def gallery():
+    if not (session.get('logged_in') or session.get('guest')):
+        return redirect(url_for('login'))
+    # Default to 2025 tab
+    try:
+        year = int(request.args.get('year', 2025))
+    except (TypeError, ValueError):
+        year = 2025
+    year = 2025 if year not in (2025, 2026) else year
+
+    year_dir = os.path.join(GALLERY_ROOT, str(year))
+    media_files = []
+    if os.path.isdir(year_dir):
+        for name in sorted(os.listdir(year_dir)):
+            if allowed_media_file(name):
+                media_files.append(name)
+
+    return render_template(
+        "gallery.html",
+        active_year=year,
+        media_files=media_files
+    )
+
+
+@app.route('/gallery/media/<int:year>/<path:filename>')
+def gallery_media(year, filename):
+    if year not in (2025, 2026):
+        abort(404)
+    # Basic path traversal protection is handled by send_from_directory and secure paths
+    directory = os.path.join(GALLERY_ROOT, str(year))
+    return send_from_directory(directory, filename)
+
+
+@app.route('/gallery/upload', methods=['POST'])
+def gallery_upload():
+    if not session.get('logged_in'):
+        flash("Only admin can upload media.")
+        return redirect(url_for('gallery'))
+    try:
+        year = int(request.form.get('year', 2025))
+    except (TypeError, ValueError):
+        year = 2025
+    year = 2025 if year not in (2025, 2026) else year
+
+    if 'file' not in request.files:
+        flash("No file part in the request.")
+        return redirect(url_for('gallery', year=year))
+    file = request.files['file']
+    if file.filename == '':
+        flash("No file selected.")
+        return redirect(url_for('gallery', year=year))
+    if file and allowed_media_file(file.filename):
+        safe_name = secure_filename(file.filename)
+        save_dir = os.path.join(GALLERY_ROOT, str(year))
+        os.makedirs(save_dir, exist_ok=True)
+        save_path = os.path.join(save_dir, safe_name)
+        file.save(save_path)
+        flash("Upload successful.")
+        return redirect(url_for('gallery', year=year))
+    else:
+        flash("Unsupported file type.")
+        return redirect(url_for('gallery', year=year))
 
 
 if __name__ == '__main__':
